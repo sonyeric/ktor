@@ -1427,10 +1427,11 @@ internal open class ByteBufferChannel(
 
         val joined = src.setupDelegateTo(this, delegateClose)
         if (src.tryCompleteJoining(joined)) {
-            return src.awaitClose()
+            src.awaitClose()
+            return
         }
 
-        return joinFromSuspend(src, delegateClose, joined)
+        joinFromSuspend(src, delegateClose, joined)
     }
 
     private suspend fun joinFromSuspend(src: ByteBufferChannel, delegateClose: Boolean, joined: JoiningState) {
@@ -1566,8 +1567,9 @@ internal open class ByteBufferChannel(
             // otherwise few bytes could be lost
             // it will be closed later in copyDirect's finalization
             // so we only do flush
-            val writing =
-                joined.delegatedTo.state.let { it is ReadWriteBufferState.Writing || it is ReadWriteBufferState.ReadingWriting }
+            val writing = joined.delegatedTo.state.let {
+                it is ReadWriteBufferState.Writing || it is ReadWriteBufferState.ReadingWriting
+            }
             if (closed.cause != null || !writing) {
                 joined.delegatedTo.close(closed.cause)
             } else {

@@ -959,23 +959,24 @@ internal open class ByteBufferChannel(
             return false
         }
         prepareWriteBuffer(this, size)
-        doWritePrimitive(size, this, capacity) { writer(value) }
+        doWritePrimitive(size, value, this, capacity, writer)
         return true
     }
 
-    private fun doWritePrimitive(
+    private fun <T> doWritePrimitive(
         size: Int,
+        value: T,
         buffer: ByteBuffer,
         capacity: RingBufferCapacity,
-        writer: ByteBuffer.() -> Unit
+        writer: ByteBuffer.(T) -> Unit
     ) {
         buffer.apply {
             if (remaining() < size) {
                 limit(capacity())
-                writer()
+                writer(value)
                 carry()
             } else {
-                writer()
+                writer(value)
             }
 
             bytesWritten(capacity, size)

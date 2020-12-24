@@ -10,19 +10,23 @@ import io.ktor.client.request.*
 import io.ktor.routing.*
 import io.ktor.server.cio.*
 import io.ktor.server.engine.*
+import io.ktor.server.testing.*
 import io.ktor.websocket.*
 import kotlinx.coroutines.*
 import java.util.concurrent.*
 import kotlin.test.*
 import kotlin.time.*
 
-class ClassCastExceptionTest {
-    private val port = 58008
+class ClassCastExceptionTest : EngineTestBase<CIOApplicationEngine, CIOApplicationEngine.Configuration>(CIO) {
+    init {
+        enableSsl = false
+    }
 
     /**
      * Regression test for KTOR-349
      */
     @Test
+    @NoHttp2
     @OptIn(ExperimentalTime::class, ExperimentalCoroutinesApi::class)
     fun testClassCastException(): Unit = runBlocking {
         val exceptionHandler = CoroutineExceptionHandler { _, cause ->

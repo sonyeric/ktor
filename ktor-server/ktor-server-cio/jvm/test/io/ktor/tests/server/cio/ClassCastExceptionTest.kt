@@ -27,7 +27,7 @@ class ClassCastExceptionTest : EngineTestBase<CIOApplicationEngine, CIOApplicati
      */
     @Test
     @NoHttp2
-    @OptIn(ExperimentalTime::class, ExperimentalCoroutinesApi::class)
+    @OptIn(ExperimentalTime::class)
     fun testClassCastException(): Unit = runBlocking {
         val exceptionHandler = CoroutineExceptionHandler { _, cause ->
             cancel("Uncaught failure", cause)
@@ -43,18 +43,21 @@ class ClassCastExceptionTest : EngineTestBase<CIOApplicationEngine, CIOApplicati
         }
 
         server.start()
-        delay(1.seconds)
+        try {
+            delay(1.seconds)
 
-        launch {
-            HttpClient(io.ktor.client.engine.cio.CIO).use { client ->
-                try {
-                    client.get<String>(port = port, path = "/hang")
-                } catch (e: Throwable) {
+            launch {
+                HttpClient(io.ktor.client.engine.cio.CIO).use { client ->
+                    try {
+                        client.get<String>(port = port, path = "/hang")
+                    } catch (e: Throwable) {
+                    }
                 }
             }
-        }
 
-        delay(1.seconds)
-        server.stop(1L, 1L, TimeUnit.SECONDS)
+            delay(1.seconds)
+        } finally {
+            server.stop(1L, 1L, TimeUnit.SECONDS)
+        }
     }
 }

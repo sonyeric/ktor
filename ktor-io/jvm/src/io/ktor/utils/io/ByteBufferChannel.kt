@@ -18,8 +18,8 @@ import java.util.concurrent.atomic.*
 import kotlin.coroutines.*
 import kotlin.coroutines.intrinsics.*
 
-internal const val DEFAULT_CLOSE_MESSAGE = "Byte channel was closed"
-private const val BYTE_BUFFER_CAPACITY = 4088
+internal const val DEFAULT_CLOSE_MESSAGE: String = "Byte channel was closed"
+private const val BYTE_BUFFER_CAPACITY: Int = 4088
 
 // implementation for ByteChannel
 internal open class ByteBufferChannel(
@@ -28,7 +28,7 @@ internal open class ByteBufferChannel(
     internal val reservedSize: Int = RESERVED_SIZE
 ) : ByteChannel, ByteReadChannel, ByteWriteChannel, LookAheadSuspendSession, HasReadSession, HasWriteSession {
 
-    public constructor(content: ByteBuffer) : this(false, BufferObjectNoPool, 0) {
+    constructor(content: ByteBuffer) : this(false, BufferObjectNoPool, 0) {
         state = ReadWriteBufferState.Initial(content.slice(), 0).apply {
             capacity.resetForRead()
         }.startWriting()
@@ -2384,69 +2384,14 @@ internal open class ByteBufferChannel(
 
     override fun toString(): String = "ByteBufferChannel(${hashCode()}, $state)"
 
-    public companion object {
-
-        private const val ReservedLongIndex = -8
+    companion object {
+        private const val ReservedLongIndex: Int = -8
 
         // todo: replace with atomicfu, remove companion object
         private val State = updater(ByteBufferChannel::state)
         private val WriteOp = updater(ByteBufferChannel::writeOp)
         private val ReadOp = updater(ByteBufferChannel::readOp)
         private val Closed = updater(ByteBufferChannel::closed)
-    }
-
-    private object TerminatedLookAhead : LookAheadSuspendSession {
-        override fun consumed(n: Int) {
-            if (n > 0) throw IllegalStateException("Unable to mark $n bytes consumed for already terminated channel")
-        }
-
-        override fun request(skip: Int, atLeast: Int): ByteBuffer? = null
-
-        override suspend fun awaitAtLeast(n: Int): Boolean {
-            require(n >= 0) { "atLeast parameter shouldn't be negative: $n" }
-            require(n <= 4088) { "atLeast parameter shouldn't be larger than max buffer size of 4088: $n" }
-
-            return false
-        }
-    }
-
-    private class ClosedElement(val cause: Throwable?) {
-        val sendException: Throwable
-            get() = cause ?: ClosedWriteChannelException("The channel was closed")
-
-        override fun toString(): String = "Closed[$sendException]"
-
-        companion object {
-            val EmptyCause = ClosedElement(null)
-        }
-    }
-
-    internal class JoiningState(val delegatedTo: ByteBufferChannel, val delegateClose: Boolean) {
-        private val _closeWaitJob = atomic<Job?>(null)
-        private val closed = atomic(0)
-
-        private val closeWaitJob: Job
-            get() {
-                while (true) {
-                    val current = _closeWaitJob.value
-                    if (current != null) return current
-                    val newJob = Job()
-                    if (_closeWaitJob.compareAndSet(null, newJob)) {
-                        if (closed.value == 1) newJob.cancel()
-                        return newJob
-                    }
-                }
-            }
-
-        fun complete() {
-            closed.value = 1
-            _closeWaitJob.getAndSet(null)?.cancel()
-        }
-
-        suspend fun awaitClose() {
-            if (closed.value == 1) return
-            return closeWaitJob.join()
-        }
     }
 }
 

@@ -933,11 +933,11 @@ internal open class ByteBufferChannel(
         writeInt(floatToRawIntBits(f))
     }
 
-    private suspend fun <T : Number> writePrimitive(
+    private suspend inline fun <T : Number> writePrimitive(
         size: Int,
         value: T,
-        channelWriter: suspend ByteBufferChannel.(T) -> Unit,
-        bufferWriter: ByteBuffer.(T) -> Unit
+        crossinline channelWriter: suspend ByteBufferChannel.(T) -> Unit,
+        crossinline bufferWriter: ByteBuffer.(T) -> Unit
     ) {
         joining?.let { resolveDelegation(this, it)?.let { return it.channelWriter(value) } }
 
@@ -949,11 +949,11 @@ internal open class ByteBufferChannel(
         }
     }
 
-    private fun <T> ByteBuffer.tryWritePrimitive(
+    private inline fun <T> ByteBuffer.tryWritePrimitive(
         size: Int,
         value: T,
         capacity: RingBufferCapacity,
-        writer: ByteBuffer.(T) -> Unit
+        crossinline writer: ByteBuffer.(T) -> Unit
     ): Boolean {
         if (!capacity.tryWriteExact(size)) {
             return false
@@ -963,12 +963,12 @@ internal open class ByteBufferChannel(
         return true
     }
 
-    private fun <T> doWritePrimitive(
+    private inline fun <T> doWritePrimitive(
         size: Int,
         value: T,
         buffer: ByteBuffer,
         capacity: RingBufferCapacity,
-        writer: ByteBuffer.(T) -> Unit
+        crossinline writer: ByteBuffer.(T) -> Unit
     ) {
         buffer.apply {
             if (remaining() < size) {
@@ -989,29 +989,28 @@ internal open class ByteBufferChannel(
         tryTerminate()
     }
 
-    private tailrec suspend fun <T : Number> ByteBuffer.writeSuspendPrimitive(
+    private suspend inline fun <T : Number> ByteBuffer.writeSuspendPrimitive(
         size: Int,
         value: T,
         capacity: RingBufferCapacity,
-        channelWriter: suspend ByteBufferChannel.(T) -> Unit,
-        bufferWriter: ByteBuffer.(T) -> Unit
+        crossinline channelWriter: suspend ByteBufferChannel.(T) -> Unit,
+        crossinline bufferWriter: ByteBuffer.(T) -> Unit
     ) {
-        try {
-            writeSuspend(size)
-        } catch (t: Throwable) {
-            restoreStateAfterWrite()
-            tryTerminate()
-            throw t
-        }
+        do {
+            try {
+                writeSuspend(size)
+            } catch (cause: Throwable) {
+                restoreStateAfterWrite()
+                tryTerminate()
+                throw cause
+            }
 
-        if (joining != null) {
-            restoreStateAfterWrite()
-            return delegatePrimitive(value, channelWriter)
-        }
-
-        if (!tryWritePrimitive(size, value, capacity, bufferWriter)) {
-            writeSuspendPrimitive(size, value, capacity, channelWriter, bufferWriter)
-        }
+            if (joining != null) {
+                restoreStateAfterWrite()
+                delegatePrimitive(value, channelWriter)
+                return
+            }
+        } while (!tryWritePrimitive(size, value, capacity, bufferWriter))
     }
 
     private suspend inline fun <T : Number> delegatePrimitive(
